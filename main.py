@@ -37,13 +37,14 @@ class Window(QWidget):
 
         th1 = Thread(target=self.main_cycle)
         th1.start()
-        # self.test()]
 
     def urls(self):
-        for i in range(len(self.players)):
-            self.url_list.append(
-                f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[i]}")
+        for i in self.players:
+            i = i.strip()
+            self.url_list.append(f"https://api.hypixel.net/player?key={self.API_KEY}&name={i}")
+        print(self.url_list)
         print('eto urls')
+
     def getinfo(self, url):
         prearr = []
         html = requests.get(url)
@@ -53,7 +54,7 @@ class Window(QWidget):
         print('eto getinfo')
 
     def runner(self):
-        with ThreadPoolExecutor(80) as executor:
+        with ThreadPoolExecutor(16) as executor:
             for url in self.url_list:
                 executor.submit(self.getinfo, url)
         print('eto runer')
@@ -81,21 +82,20 @@ class Window(QWidget):
                 playerinfo.append(bwlevel)
                 playerinfo.append(round(finalk / finald, 2))
                 self.allplayersinfo.append(playerinfo)
-                self.lobby.append(displayname)
             else:
                 nickedurl = self.arr[l][1]
                 nickedname = nickedurl[(nickedurl.rfind("=") + 1):]
-                playerinfo = [nickedname, 0, 0]
+                playerinfo = [nickedname, 'nick', 0]
                 self.allplayersinfo.append(playerinfo)
         print('eto printer')
 
     def main_cycle(self):
-        wholist = []
         while True:
             self.arr = []
             self.url_list = []
             self.players = []
             self.allplayersinfo = []
+            self.lobby = []
             file1 = r"C:\Users\123\.lunarclient\offline\1.8\logs\latest.log"
             with open(file1) as file:
                 pretimearray = file.readlines(-1)
@@ -118,12 +118,13 @@ class Window(QWidget):
                                         jointimeh = int(i[1:3])
                                         jointimem = int(i[4:6])
                                         jointimes = int(i[7:9])
-                                        wholist.append(i)
+                                        self.whostring = i
+                                        print(self.whostring)
                 if self.playerlist != self.players:
                     self.playerlist = self.players
                     self.a = 1
                 else:
-                    time.sleep(1)
+                    time.sleep(0.01)
             if len(self.players) != 0:
                 self.urls()
                 self.runner()
@@ -134,17 +135,21 @@ class Window(QWidget):
 
             self.a = 0
             joinedlist = []
-            self.players = []
             joinedstr = ""
             quitstr = ""
+            label = True
             while True:
                 with open(file1) as f:
+                    if label == False:
+                        break
                     for i in f:
                         if len(i) >= 15:
                             if i[1:3].isdecimal() and i[4:6].isdecimal():
-                                if not i in wholist:
-                                    if "ONLINE" in i or "?????????????????????????" in i:
-                                        #тут пропиши нормальный брейк я дебил просто сори
+                                if "ONLINE" in i or "?????????????????????????" in i:
+                                    if not i == self.whostring and (jointimeh < int(i[1:3]) or (jointimeh == int(i[1:3]) and jointimem < int(i[4:6])) or (jointimeh == int(i[1:3]) and jointimem == int(i[4:6]) and jointimes <= int(i[7:9]))):
+                                        print('чел где брек')
+                                        label = False
+                                        break
                         if len(i) >= 15:
                             if i[1].isdecimal() and i[4].isdecimal():
                                 if jointimeh < int(i[1:3]) or (jointimeh == int(i[1:3]) and jointimem < int(i[4:6])) or (jointimeh == int(i[1:3]) and jointimem == int(i[4:6]) and jointimes <= int(i[7:9])):
@@ -161,36 +166,34 @@ class Window(QWidget):
                                                         playercounter = playercount[1][0]
                                                     else:
                                                         playercounter = playercount[1][0:2]
-                                                    if playernumber == playercounter or int(playernumber) + 1 == int(
-                                                            playercounter):
+                                                    if playernumber == playercounter or int(playernumber) + 1 == int(playercounter):
                                                         self.arr = []
+                                                        self.url_list = []
                                                         self.urls()
                                                         self.runner()
                                                         self.printer()
-                                                        self.players = []
                                                 jointimeh = int(i[1:3])
                                                 jointimem = int(i[4:6])
                                                 jointimes = int(i[7:9])
-                                                joinedlist.append(
-                                                    preplayers[4])
+                                                joinedlist.append(preplayers[4])
                                                 self.signal.update_table.emit()
                                                     # print(self.allplayersinfo)
-                                                    # print(
-                                                    #     len(self.allplayersinfo))
+                                                    # print(len(self.allplayersinfo))
                                                 joinedstr = i
                                     elif "has quit" in i:
-                                        preplayers = list(
-                                            map(str, i.split()))
+                                        preplayers = list(map(str, i.split()))
+                                        self.lobby = []
+                                        for h in self.allplayersinfo:
+                                            self.lobby.append(h[0])
                                         if preplayers[4] in self.lobby:
-                                            self.players.append(
-                                                preplayers[4])
-                                            apiurl = f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[0]}"
+                                            playername = preplayers[4]
+
+                                            apiurl = f"https://api.hypixel.net/player?key={self.API_KEY}&name={playername}"
                                             if apiurl in self.url_list:
                                                 del self.url_list[self.url_list.index(apiurl)]
-                                            if preplayers[4] in self.allplayersinfo:
-                                                del self.allplayersinfo[self.allplayersinfo.index(preplayers[4])]
-                                            del self.lobby[self.lobby.index(preplayers[4])]
-                                            self.players = []
+                                            del self.allplayersinfo[self.lobby.index(playername)]
+                                            del self.lobby[self.lobby.index(playername)]
+                                            del self.players[self.players.index(playername)]
                                         jointimeh = int(i[1:3])
                                         jointimem = int(i[4:6])
                                         jointimes = int(i[7:9])
@@ -200,25 +203,6 @@ class Window(QWidget):
                                             # print(len(self.allplayersinfo))
                                         quitstr = i
         print('eto main')
-    #######
-    #######
-    #######
-
-    def test(self):
-        input('start 1: ')
-        self.array = [['Eglyo', 20, 0.35], ['6692', 31, 0.36], [
-            'edx_7', 18, 0.26], ['zaradog', 39, 0.44], ['Usain_Bald', 82, 8.07]]
-        self.fill_table(self.array)
-        print('1 done')
-
-        input('start 2: ')
-        self.array = [['Z4maaaaaaaaaaaaaaan', 234, 1.51], ['IssaRam', 61, 1.98], ['NotSxrry', 21, 2.15],
-                      ['Szczypson8985', 18, 0.21], ['ZXEMISKY12', 1, 1.0], ['BenGFox', 9, 0.66], ['IITMM', 23, 0.49], [
-                          'lazyshadow', 0, 0], ['EdvinTheBot', 70, 0.41], ['Genexis', 252, 0.95],
-                      ['IReallyLike_Bees', 14, 0.31], ['Usain_Bald', 82, 8.07], ['renoi', 72, 1.27],
-                      ['Adital', 21, 0.64]]
-        self.fill_table(self.array)
-        print('2 done')
 
     def fill_table(self):
         array = self.allplayersinfo[:]
@@ -236,17 +220,6 @@ class Window(QWidget):
         self.table.resizeRowsToContents()
         self.table.update()
         print('eto fill table')
-
-    # self.array = [['Eglyo', 20, 0.35], ['6692', 31, 0.36], ['edx_7', 18, 0.26],
-    #          ['zaradog', 39, 0.44], ['Usain_Bald', 82, 8.07]]
-
-    # table.show()
-    # app.closeAllWindows()
-    # time.sleep(1)
-    # self.array = [['Z4man', 234, 1.51], ['IssaRam', 61, 1.98], ['NotSxrry', 21, 2.15], ['Szczypson8985', 18, 0.21], ['ZXEMISKY12', 1, 1.0], ['BenGFox', 9, 0.66], ['IITMM', 23, 0.49], [
-    #     'lazyshadow', 0, 0], ['EdvinTheBot', 70, 0.41], ['Genexis', 252, 0.95], ['IReallyLike_Bees', 14, 0.31], ['Usain_Bald', 82, 8.07], ['renoi', 72, 1.27], ['Adital', 21, 0.64]]
-    # self.array.sort(key=lambdself.ax: x[2], reverse=True)
-    # app.exec_()
 
 
 if __name__ == '__main__':
