@@ -41,22 +41,22 @@ class Window(QWidget):
 
     def urls(self):
         for i in range(len(self.players)):
-            self.url_list.append(
-                f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[i]}")
-        print('eto urls')
+            self.url_list.append(f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[i]}")
+        print('urls')
+
     def getinfo(self, url):
         prearr = []
         html = requests.get(url)
         prearr.append(html.json())
         prearr.append(url)
         self.arr.append(prearr)
-        print('eto getinfo')
+        print('getinfo')
 
     def runner(self):
         with ThreadPoolExecutor(80) as executor:
             for url in self.url_list:
                 executor.submit(self.getinfo, url)
-        print('eto runer')
+        print('runer')
 
     def printer(self):
         self.allplayersinfo = []
@@ -87,7 +87,7 @@ class Window(QWidget):
                 nickedname = nickedurl[(nickedurl.rfind("=") + 1):]
                 playerinfo = [nickedname, 0, 0]
                 self.allplayersinfo.append(playerinfo)
-        print('eto printer')
+        print('printer')
 
     def main_cycle(self):
         wholist = []
@@ -137,14 +137,18 @@ class Window(QWidget):
             self.players = []
             joinedstr = ""
             quitstr = ""
+            flag = True
             while True:
+                if flag == False:
+                    break
                 with open(file1) as f:
                     for i in f:
                         if len(i) >= 15:
                             if i[1:3].isdecimal() and i[4:6].isdecimal():
                                 if not i in wholist:
                                     if "ONLINE" in i or "?????????????????????????" in i:
-                                        #тут пропиши нормальный брейк я дебил просто сори
+                                        flag = False
+
                         if len(i) >= 15:
                             if i[1].isdecimal() and i[4].isdecimal():
                                 if jointimeh < int(i[1:3]) or (jointimeh == int(i[1:3]) and jointimem < int(i[4:6])) or (jointimeh == int(i[1:3]) and jointimem == int(i[4:6]) and jointimes <= int(i[7:9])):
@@ -161,8 +165,7 @@ class Window(QWidget):
                                                         playercounter = playercount[1][0]
                                                     else:
                                                         playercounter = playercount[1][0:2]
-                                                    if playernumber == playercounter or int(playernumber) + 1 == int(
-                                                            playercounter):
+                                                    if playernumber == playercounter or int(playernumber) + 1 == int(playercounter):
                                                         self.arr = []
                                                         self.urls()
                                                         self.runner()
@@ -174,16 +177,14 @@ class Window(QWidget):
                                                 joinedlist.append(
                                                     preplayers[4])
                                                 self.signal.update_table.emit()
-                                                    # print(self.allplayersinfo)
-                                                    # print(
-                                                    #     len(self.allplayersinfo))
+                                                # print(self.allplayersinfo)
+                                                # print(
+                                                #     len(self.allplayersinfo))
                                                 joinedstr = i
                                     elif "has quit" in i:
-                                        preplayers = list(
-                                            map(str, i.split()))
+                                        preplayers = list(map(str, i.split()))
                                         if preplayers[4] in self.lobby:
-                                            self.players.append(
-                                                preplayers[4])
+                                            self.players.append(preplayers[4])
                                             apiurl = f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[0]}"
                                             if apiurl in self.url_list:
                                                 del self.url_list[self.url_list.index(apiurl)]
@@ -199,7 +200,7 @@ class Window(QWidget):
                                             # print(self.allplayersinfo)
                                             # print(len(self.allplayersinfo))
                                         quitstr = i
-        print('eto main')
+        print('main')
     #######
     #######
     #######
@@ -215,7 +216,8 @@ class Window(QWidget):
         self.array = [['Z4maaaaaaaaaaaaaaan', 234, 1.51], ['IssaRam', 61, 1.98], ['NotSxrry', 21, 2.15],
                       ['Szczypson8985', 18, 0.21], ['ZXEMISKY12', 1, 1.0], ['BenGFox', 9, 0.66], ['IITMM', 23, 0.49], [
                           'lazyshadow', 0, 0], ['EdvinTheBot', 70, 0.41], ['Genexis', 252, 0.95],
-                      ['IReallyLike_Bees', 14, 0.31], ['Usain_Bald', 82, 8.07], ['renoi', 72, 1.27],
+                      ['IReallyLike_Bees', 14, 0.31], [
+                          'Usain_Bald', 82, 8.07], ['renoi', 72, 1.27],
                       ['Adital', 21, 0.64]]
         self.fill_table(self.array)
         print('2 done')
@@ -235,18 +237,7 @@ class Window(QWidget):
         self.table.resizeColumnsToContents()
         self.table.resizeRowsToContents()
         self.table.update()
-        print('eto fill table')
-
-    # self.array = [['Eglyo', 20, 0.35], ['6692', 31, 0.36], ['edx_7', 18, 0.26],
-    #          ['zaradog', 39, 0.44], ['Usain_Bald', 82, 8.07]]
-
-    # table.show()
-    # app.closeAllWindows()
-    # time.sleep(1)
-    # self.array = [['Z4man', 234, 1.51], ['IssaRam', 61, 1.98], ['NotSxrry', 21, 2.15], ['Szczypson8985', 18, 0.21], ['ZXEMISKY12', 1, 1.0], ['BenGFox', 9, 0.66], ['IITMM', 23, 0.49], [
-    #     'lazyshadow', 0, 0], ['EdvinTheBot', 70, 0.41], ['Genexis', 252, 0.95], ['IReallyLike_Bees', 14, 0.31], ['Usain_Bald', 82, 8.07], ['renoi', 72, 1.27], ['Adital', 21, 0.64]]
-    # self.array.sort(key=lambdself.ax: x[2], reverse=True)
-    # app.exec_()
+        print('fill table')
 
 
 if __name__ == '__main__':
