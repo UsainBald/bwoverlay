@@ -22,26 +22,131 @@ class Window(QWidget):
         self.show()
         print('UI init completed')
 
-        self.playerlist = []
-        self.arr = []
-        self.url_list = []
-        self.players = []
+        self.filename = "C:/Users/123/.lunarclient/offline/1.8/logs/latest.log"
         self.API_KEY = "f57c9f4a-175b-430c-a261-d8c199abd927"
-        self.a = 0
-        self.whostring = ''
-        self.allplayersinfo = []
-        self.lobby = []
+        self.players = {}
+        self.players_raw = []  # keep clean
 
         self.signal = Communicate()
         self.signal.update_table.connect(self.fill_table)
 
-        th1 = Thread(target=self.main_cycle)
+        th1 = Thread(target=self.main)
         th1.start()
-        # self.test()]
+
+    def main(self):
+        while True:
+            f = open(self.filename, mode='r')
+            line = f.readlines()[-1]
+            changed = False
+            if "ONLINE" in line or "[CHAT]" in line:
+                self.new_game(line)
+                changed = True
+            elif "has joined" in line:
+                self.player_joined(line)
+                changed = True
+            elif "has quit" in line:
+                self.player_quit(line)
+                changed = True
+            elif "?????????????????????????????????????" in line:
+                self.players = {}
+                self.players_raw = []
+                changed = True
+                with open(self.filename, 'wb'):  # полностью очищает файл логов
+                    pass
+            if changed:
+                self.signal.update_table.emit()
+            f.close()
+
+    def new_game(self, line):
+        self.players = {}
+        # 48 - длина   "[20:25:37] [Client thread/INFO]: [CHAT] ONLINE: "
+        current = line[48:].split(', ')
+        self.player_submit(current)
+
+    def player_joined(self, line):
+        # todo: посмотри тут, у тебя написано [4]
+        self.player_submit([line[3]])
+
+    def player_quit(self, line):
+        try:
+            del self.players[line.split()[3]]
+        except Exception:
+            pass  # todo: сделать обработку ошибки
+
+    def player_submit(self, arr):
+        self.multithreading_request(arr)
+        self.players_rawdata_process()
+        self.players_raw = []
+
+    def multithreading_request(self, arr):
+        url_list = []
+        for i in arr:
+            url_list.append(
+                f"https://api.hypixel.net/player?key={self.API_KEY}&name={i}")
+        with ThreadPoolExecutor(80) as executor:
+            for url in url_list:
+                executor.submit(self.getinfo, url)
+
+    def get_raw_data(self, url):
+        self.players_raw.append(requests.get(url).json())
+
+    def players_rawdata_process(self):
+        for i in self.players_raw:
+            s = i[0]
+            player = s.get('player')
+            if not player == None:
+                displayname = player.get("displayname")
+                stats = player.get('stats')
+                bw = stats.get('Bedwars')
+                ach = player.get('achievements')
+                bwlevel = ach.get('bedwars_level')
+                finalk = bw.get('final_kills_bedwars')
+                if finalk == None:
+                    finalk = 0
+                finald = bw.get('final_deaths_bedwars')
+                if finald == None:
+                    finald = 1
+                playerinfo = []
+                playerinfo.append(displayname)
+                playerinfo.append(bwlevel)
+                playerinfo.append(round(finalk / finald, 2))
+                self.players[displayname] = playerinfo
+            else:
+                nickedurl = i[1]
+                nickedname = nickedurl[(nickedurl.rfind("=") + 1):]
+                playerinfo = [nickedname, 0, 0]
+                self.players[nickedname] = playerinfo
+
+    def fill_table(self):
+        array = []
+        for i in self.players:
+            array.append(i[:])
+
+        self.table.setRowCount(0)
+        self.table.setRowCount(len(array))
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Name", "Level", "FKDR"])
+
+        array.sort(key=lambda x: x[2], reverse=True)
+        for f in range(3):
+            for i in range(len(array)):
+                self.table.setItem(
+                    i, f, QTableWidgetItem(str(array[i][f])))
+        self.table.resizeColumnsToContents()
+        self.table.resizeRowsToContents()
+        self.table.update()
+        print('fill table')
+
+    ####################################
+    ####################################
+    ########      OLDS      ############
+    ####################################
+    ####################################
 
     def urls(self):
         for i in range(len(self.players)):
-            self.url_list.append(f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[i]}")
+            self.url_list.append(
+                f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[i]}")
         print('urls')
 
     def getinfo(self, url):
@@ -111,7 +216,8 @@ class Window(QWidget):
                             if i[1].isdecimal() and i[4].isdecimal():
                                 if jointimeh < int(i[1:3]) or (jointimeh == int(i[1:3]) and jointimem < int(i[4:6])) or (jointimeh == int(i[1:3]) and jointimem == int(i[4:6]) and jointimes <= int(i[7:9])):
                                     if "ONLINE" in i and "[CHAT]" in i:
-                                        self.players = list(map(str, i.split(", ")))
+                                        self.players = list(
+                                            map(str, i.split(", ")))
                                         player1 = self.players[0].split(": ")
                                         self.players.append(player1[-1])
                                         del self.players[0]
@@ -154,12 +260,15 @@ class Window(QWidget):
                                 if jointimeh < int(i[1:3]) or (jointimeh == int(i[1:3]) and jointimem < int(i[4:6])) or (jointimeh == int(i[1:3]) and jointimem == int(i[4:6]) and jointimes <= int(i[7:9])):
                                     if "has joined" in i:
                                         if not joinedstr == i:
-                                            preplayers = list(map(str, i.split()))
+                                            preplayers = list(
+                                                map(str, i.split()))
                                             if not preplayers[4] in joinedlist:
                                                 if not preplayers[4] in self.playerlist and not preplayers[4] in self.players and not preplayers[4] in joinedlist:
-                                                    self.players.append(preplayers[4])
+                                                    self.players.append(
+                                                        preplayers[4])
                                                     playercount = preplayers[-1]
-                                                    playercount = playercount.split('/')
+                                                    playercount = playercount.split(
+                                                        '/')
                                                     playernumber = playercount[0][1:]
                                                     if len(playercount[1]) == 3:
                                                         playercounter = playercount[1][0]
@@ -187,10 +296,13 @@ class Window(QWidget):
                                             self.players.append(preplayers[4])
                                             apiurl = f"https://api.hypixel.net/player?key={self.API_KEY}&name={self.players[0]}"
                                             if apiurl in self.url_list:
-                                                del self.url_list[self.url_list.index(apiurl)]
+                                                del self.url_list[self.url_list.index(
+                                                    apiurl)]
                                             if preplayers[4] in self.allplayersinfo:
-                                                del self.allplayersinfo[self.allplayersinfo.index(preplayers[4])]
-                                            del self.lobby[self.lobby.index(preplayers[4])]
+                                                del self.allplayersinfo[self.allplayersinfo.index(
+                                                    preplayers[4])]
+                                            del self.lobby[self.lobby.index(
+                                                preplayers[4])]
                                             self.players = []
                                         jointimeh = int(i[1:3])
                                         jointimem = int(i[4:6])
@@ -221,23 +333,6 @@ class Window(QWidget):
                       ['Adital', 21, 0.64]]
         self.fill_table(self.array)
         print('2 done')
-
-    def fill_table(self):
-        array = self.allplayersinfo[:]
-        self.table.setRowCount(0)
-        self.table.setRowCount(len(array))
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(["Name", "Level", "FKDR"])
-
-        array.sort(key=lambda x: x[2], reverse=True)
-        for f in range(3):
-            for i in range(len(array)):
-                self.table.setItem(
-                    i, f, QTableWidgetItem(str(array[i][f])))
-        self.table.resizeColumnsToContents()
-        self.table.resizeRowsToContents()
-        self.table.update()
-        print('fill table')
 
 
 if __name__ == '__main__':
