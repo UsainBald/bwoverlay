@@ -26,6 +26,7 @@ class Window(QWidget):
         self.API_KEY = "f57c9f4a-175b-430c-a261-d8c199abd927"
         self.players = {}
         self.players_raw = []  # keep clean
+        self.last_line = ''
 
         self.signal = Communicate()
         self.signal.update_table.connect(self.fill_table)
@@ -37,35 +38,34 @@ class Window(QWidget):
         while True:
             f = open(self.filename, mode='r')
             line = f.readlines()[-1]
-            changed = False
-            if "ONLINE" in line or "[CHAT]" in line:
+            f.close()
+            changed = True
+            if line == self.last_line:
+                continue
+
+            if "ONLINE" in line and "[CHAT]" in line:
                 self.new_game(line)
-                changed = True
             elif "has joined" in line:
                 self.player_joined(line)
-                changed = True
             elif "has quit" in line:
                 self.player_quit(line)
-                changed = True
             elif "?????????????????????????????????????" in line:
                 self.players = {}
                 self.players_raw = []
-                changed = True
                 with open(self.filename, 'wb'):  # полностью очищает файл логов
                     pass
+            else:
+                changed = False
             if changed:
                 self.signal.update_table.emit()
-            f.close()
 
     def new_game(self, line):
-        self.players = {}
         # 48 - длина   "[20:25:37] [Client thread/INFO]: [CHAT] ONLINE: "
         current = line[48:].split(', ')
         self.player_submit(current)
 
     def player_joined(self, line):
-        # todo: посмотри тут, у тебя написано [4]
-        self.player_submit([line[3]])
+        self.player_submit([line[4]])
 
     def player_quit(self, line):
         try:
@@ -82,17 +82,17 @@ class Window(QWidget):
         url_list = []
         for i in arr:
             url_list.append(
-                f"https://api.hypixel.net/player?key={self.API_KEY}&name={i}")
+                f"https://api.hypixel.net/player?key={self.API_KEY}&name={i.strip()}")
         with ThreadPoolExecutor(80) as executor:
             for url in url_list:
-                executor.submit(self.getinfo, url)
+                executor.submit(self.get_raw_data, url)
 
     def get_raw_data(self, url):
         self.players_raw.append(requests.get(url).json())
 
     def players_rawdata_process(self):
         for i in self.players_raw:
-            s = i[0]
+            s = i
             player = s.get('player')
             if not player == None:
                 displayname = player.get("displayname")
@@ -111,16 +111,17 @@ class Window(QWidget):
                 playerinfo.append(bwlevel)
                 playerinfo.append(round(finalk / finald, 2))
                 self.players[displayname] = playerinfo
-            else:
-                nickedurl = i[1]
-                nickedname = nickedurl[(nickedurl.rfind("=") + 1):]
-                playerinfo = [nickedname, 0, 0]
-                self.players[nickedname] = playerinfo
+            # todo: nicked players process
+            # else:
+            #     nickedurl = i[1]
+            #     nickedname = nickedurl[(nickedurl.rfind("=") + 1):]
+            #     playerinfo = [nickedname, 0, 0]
+            #     self.players[nickedname] = playerinfo
 
     def fill_table(self):
         array = []
         for i in self.players:
-            array.append(i[:])
+            array.append(self.players[i][:])
 
         self.table.setRowCount(0)
         self.table.setRowCount(len(array))
