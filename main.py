@@ -1,7 +1,7 @@
 import requests
 from concurrent.futures import ThreadPoolExecutor
 import time
-from PyQt5.QtCore import pyqtSignal, QObject
+from PyQt5.QtCore import pyqtSignal, QObject, Qt
 from PyQt5.QtWidgets import QTableWidgetItem, QVBoxLayout, QApplication, QLabel, QWidget, QTableWidget
 import sys
 from threading import Thread
@@ -17,6 +17,7 @@ class Window(QWidget):
         self.verticalLayout = QVBoxLayout(self)
         self.table = QTableWidget()
         self.verticalLayout.addWidget(self.table)
+        self.setWindowFlag(Qt.WindowStaysOnTopHint)
 
         self.setWindowTitle("Bedwars overlay")
         self.show()
@@ -27,20 +28,18 @@ class Window(QWidget):
         self.players = {}
         self.players_raw = []  # keep clean
         self.last_line = ''
+        self.log_endpos = self.log_endpos_calibrate()
 
         self.signal = Communicate()
         self.signal.update_table.connect(self.fill_table)
-
         th1 = Thread(target=self.main)
         th1.start()
 
     def main(self):
         while True:
-            f = open(self.filename, mode='r')
-            line = f.readlines()[-1]
-            f.close()
+            line = self.read_logs()
             changed = True
-            if line == self.last_line:
+            if line == '':
                 continue
 
             if "ONLINE" in line and "[CHAT]" in line:
@@ -52,12 +51,31 @@ class Window(QWidget):
             elif "?????????????????????????????????????" in line:
                 self.players = {}
                 self.players_raw = []
-                with open(self.filename, 'wb'):  # полностью очищает файл логов
-                    pass
+                self.signal.update_table.emit()
+                changed = False
+                self.showMinimized()
             else:
                 changed = False
             if changed:
                 self.signal.update_table.emit()
+
+    def read_logs(self):
+        f = open(self.filename, mode='r')
+        f.seek(self.log_endpos)
+        f.close()
+        try:
+            line = f.read()
+            self.log_endpos += len(line)
+            return line.strip('\r\n')
+        except Exception:
+            print('####  LOG READING ERROR  ####')
+            self.log_endpos = self.log_endpos_calibrate()
+            return ''
+
+    def log_endpos_calibrate(self):
+        f = open(self.filename, mode="r")
+        f.close()
+        return len(f.read())
 
     def new_game(self, line):
         # 48 - длина   "[20:25:37] [Client thread/INFO]: [CHAT] ONLINE: "
@@ -136,6 +154,8 @@ class Window(QWidget):
         self.table.resizeColumnsToContents()
         self.table.resizeRowsToContents()
         self.table.update()
+        if self.isMinimized():
+            self.showNormal()
         print('fill table')
 
     ####################################
