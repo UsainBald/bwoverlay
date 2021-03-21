@@ -60,11 +60,13 @@ class Window(QWidget):
                 self.signal.update_table.emit()
 
     def read_logs(self):
-        f = open(self.filename, mode='r')
-        f.seek(self.log_endpos)
-        f.close()
         try:
+            f = open(self.filename, mode='r')
+            f.seek(self.log_endpos)
             line = f.read()
+            f.close()
+            if line[-1] != '\n':
+                return ''
             self.log_endpos += len(line)
             return line.strip('\r\n')
         except Exception:
@@ -74,8 +76,9 @@ class Window(QWidget):
 
     def log_endpos_calibrate(self):
         f = open(self.filename, mode="r")
+        t = len(f.read())
         f.close()
-        return len(f.read())
+        return t
 
     def new_game(self, line):
         # 48 - длина   "[20:25:37] [Client thread/INFO]: [CHAT] ONLINE: "
@@ -83,11 +86,11 @@ class Window(QWidget):
         self.player_submit(current)
 
     def player_joined(self, line):
-        self.player_submit([line[4]])
+        self.player_submit([line.split()[4]])
 
     def player_quit(self, line):
         try:
-            del self.players[line.split()[3]]
+            del self.players[line.split()[4]]
         except Exception:
             pass  # todo: сделать обработку ошибки
 
@@ -101,7 +104,7 @@ class Window(QWidget):
         for i in arr:
             url_list.append(
                 f"https://api.hypixel.net/player?key={self.API_KEY}&name={i.strip()}")
-        with ThreadPoolExecutor(80) as executor:
+        with ThreadPoolExecutor(16) as executor:
             for url in url_list:
                 executor.submit(self.get_raw_data, url)
 
@@ -129,6 +132,8 @@ class Window(QWidget):
                 playerinfo.append(bwlevel)
                 playerinfo.append(round(finalk / finald, 2))
                 self.players[displayname] = playerinfo
+            else:
+                print('####  ERROR: NICKED PLAYER DETECTED  ####')
             # todo: nicked players process
             # else:
             #     nickedurl = i[1]
