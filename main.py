@@ -25,11 +25,11 @@ class Window(QWidget):
         print('UI init completed')
 
         self.filename = "C:/Users/123/.lunarclient/offline/1.8/logs/latest.log"
-        self.logfile_lastchanged = None
+        # self.filename = "D:/Users/DEN/Pictures/del4/asa/bwoverlay/a.log"
+        self.logfile_lastchanged = 0  # время последнего изменения файла логов
         self.API_KEY = "f57c9f4a-175b-430c-a261-d8c199abd927"
         self.players = {}
         self.players_raw = []  # keep clean
-        self.last_line = ''
         self.log_endpos = self.log_endpos_calibrate()
 
         self.signal = Communicate()
@@ -39,6 +39,7 @@ class Window(QWidget):
 
     def main(self):
         while True:
+            time.sleep(0.0000001)
             line = self.read_logs()
             changed = True
             if line == None:
@@ -67,37 +68,41 @@ class Window(QWidget):
             return None
         else:
             self.logfile_lastchanged = curtime
-
+        # time.sleep(0.01) - нужно посмотреть, нужна ли эта строчка
         try:
             f = open(self.filename, mode='r')
             f.seek(self.log_endpos)
             line = f.read()
+            # print('|', line.strip('\r\n'), '|', sep='')
             f.close()
             if line[-1] != '\n':
                 print("####  ERROR: FILE LAST LINE NOT ENDS WITH \\n  ####")
                 print(line, '\n')
-                return ''
+                return None
             self.log_endpos += len(line)
-            return line.strip('\r\n')
-        except Exception:
+            return line.strip('\n')
+        except Exception as e:
             print('####  LOG READING ERROR  ####')
-            raise SystemExit
+            print(e)
+            # raise SystemExit
             # self.log_endpos = self.log_endpos_calibrate()
             # return ''
 
     def log_endpos_calibrate(self):
         f = open(self.filename, mode="r")
         r = f.read()
-        t = len(f.read())
+        t = f.tell()
         f.close()
-        if r[-1] != '\n':
-            return - 1
         self.logfile_lastchanged = os.stat(self.filename).st_mtime
         return t
 
     def new_game(self, line):
         # 48 - длина   "[20:25:37] [Client thread/INFO]: [CHAT] ONLINE: "
-        current = line[48:].split(', ')
+        a = line[48:].split(', ')
+        current = []
+        for i in a:
+            if i in self.players:
+                current.append(a)
         self.player_submit(current)
 
     def player_joined(self, line):
@@ -125,12 +130,13 @@ class Window(QWidget):
 
     def get_raw_data(self, url):
         self.players_raw.append(requests.get(url).json())
+        # time.sleep(0.01)
 
     def players_rawdata_process(self):
         for i in self.players_raw:
             s = i
             player = s.get('player')
-            if not player == None:
+            if player != None:
                 displayname = player.get("displayname")
                 stats = player.get('stats')
                 bw = stats.get('Bedwars')
