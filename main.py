@@ -5,6 +5,7 @@ from PyQt5.QtCore import pyqtSignal, QObject, Qt
 from PyQt5.QtWidgets import QTableWidgetItem, QVBoxLayout, QApplication, QLabel, QWidget, QTableWidget
 import sys
 from threading import Thread
+import os
 
 
 class Communicate(QObject):
@@ -24,6 +25,7 @@ class Window(QWidget):
         print('UI init completed')
 
         self.filename = "C:/Users/123/.lunarclient/offline/1.8/logs/latest.log"
+        self.logfile_lastchanged = None
         self.API_KEY = "f57c9f4a-175b-430c-a261-d8c199abd927"
         self.players = {}
         self.players_raw = []  # keep clean
@@ -39,7 +41,7 @@ class Window(QWidget):
         while True:
             line = self.read_logs()
             changed = True
-            if line == '':
+            if line == None:
                 continue
 
             if "ONLINE" in line and "[CHAT]" in line:
@@ -53,31 +55,44 @@ class Window(QWidget):
                 self.players_raw = []
                 self.signal.update_table.emit()
                 changed = False
-                self.showMinimized()
+                # self.showMinimized()
             else:
                 changed = False
             if changed:
                 self.signal.update_table.emit()
 
     def read_logs(self):
+        curtime = os.stat(self.filename).st_mtime
+        if curtime == self.logfile_lastchanged:
+            return None
+        else:
+            self.logfile_lastchanged = curtime
+
         try:
             f = open(self.filename, mode='r')
             f.seek(self.log_endpos)
             line = f.read()
             f.close()
             if line[-1] != '\n':
+                print("####  ERROR: FILE LAST LINE NOT ENDS WITH \\n  ####")
+                print(line, '\n')
                 return ''
             self.log_endpos += len(line)
             return line.strip('\r\n')
         except Exception:
             print('####  LOG READING ERROR  ####')
-            self.log_endpos = self.log_endpos_calibrate()
-            return ''
+            raise SystemExit
+            # self.log_endpos = self.log_endpos_calibrate()
+            # return ''
 
     def log_endpos_calibrate(self):
         f = open(self.filename, mode="r")
+        r = f.read()
         t = len(f.read())
         f.close()
+        if r[-1] != '\n':
+            return - 1
+        self.logfile_lastchanged = os.stat(self.filename).st_mtime
         return t
 
     def new_game(self, line):
@@ -159,8 +174,8 @@ class Window(QWidget):
         self.table.resizeColumnsToContents()
         self.table.resizeRowsToContents()
         self.table.update()
-        if self.isMinimized():
-            self.showNormal()
+        # if self.isMinimized():
+        #     self.showNormal()
         print('fill table')
 
     ####################################
