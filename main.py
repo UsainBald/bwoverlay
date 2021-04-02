@@ -19,7 +19,6 @@ class Window(QWidget):
         self.table = QTableWidget()
         self.verticalLayout.addWidget(self.table)
         self.setWindowFlag(Qt.WindowStaysOnTopHint)
-
         self.setWindowTitle("Bedwars overlay")
         self.show()
         print('UI init completed')
@@ -30,7 +29,9 @@ class Window(QWidget):
         self.API_KEY = "f57c9f4a-175b-430c-a261-d8c199abd927"
         self.players = {}
         self.players_raw = []  # keep clean
-        self.log_endpos = self.log_endpos_calibrate()
+        self.log_endpos = self.log_endpos_calibrate()  # последняя позиция чтения логов
+        self.log_islastline = False  # уверены ли мы, что прочитана последняя линия
+        # self.lobby_process = True  # смотрим, находимся мы в лобби или в игре
 
         self.signal = Communicate()
         self.signal.update_table.connect(self.fill_table)
@@ -39,7 +40,7 @@ class Window(QWidget):
 
     def main(self):
         while True:
-            time.sleep(0.0000001)
+            time.sleep(0.0001)
             line = self.read_logs()
             changed = True
             if line == None:
@@ -54,9 +55,9 @@ class Window(QWidget):
             elif "?????????????????????????????????????" in line:
                 self.players = {}
                 self.players_raw = []
-                self.signal.update_table.emit()
-                changed = False
-                # self.showMinimized()
+                # self.signal.update_table.emit()
+                # changed = False
+                # # self.showMinimized()
             else:
                 changed = False
             if changed:
@@ -64,23 +65,47 @@ class Window(QWidget):
 
     def read_logs(self):
         curtime = os.stat(self.filename).st_mtime
-        if curtime == self.logfile_lastchanged:
+        if curtime == self.logfile_lastchanged and self.log_islastline:
             return None
+        elif not self.log_islastline:
+            try:
+                f = open(self.filename, mode='r')
+                f.seek(self.log_endpos)
+                c = f.read(1)
+                f.close()
+            except Exception:
+                self.log_islastline = True
+                return None
         else:
             self.logfile_lastchanged = curtime
         # time.sleep(0.01) - нужно посмотреть, нужна ли эта строчка
         try:
             f = open(self.filename, mode='r')
             f.seek(self.log_endpos)
-            line = f.read()
-            # print('|', line.strip('\r\n'), '|', sep='')
+            line = ''
+            try:
+                while True:
+                    c = f.read(1)
+                    line += c
+                    if c == '\n':
+                        break
+            except Exception:
+                print("####  ERROR: FILE LAST LINE NOT ENDS WITH \\n  ####")
+                print(line, '\n')
+                return None
+
+            print('|', line.strip('\r\n'), '|', sep='')
             f.close()
+
             if line[-1] != '\n':
                 print("####  ERROR: FILE LAST LINE NOT ENDS WITH \\n  ####")
                 print(line, '\n')
                 return None
-            self.log_endpos += len(line)
+
+            self.log_endpos += len(line) + 1
+            self.log_islastline = False
             return line.strip('\n')
+
         except Exception as e:
             print('####  LOG READING ERROR  ####')
             print(e)
@@ -101,7 +126,7 @@ class Window(QWidget):
         a = line[48:].split(', ')
         current = []
         for i in a:
-            if i in self.players:
+            if i not in self.players:
                 current.append(a)
         self.player_submit(current)
 
@@ -112,6 +137,7 @@ class Window(QWidget):
         try:
             del self.players[line.split()[4]]
         except Exception:
+            print("####  ERROR: QUITING PLAYER DOES NOT EXISTS  ####")
             pass  # todo: сделать обработку ошибки
 
     def player_submit(self, arr):
@@ -127,6 +153,9 @@ class Window(QWidget):
         with ThreadPoolExecutor(16) as executor:
             for url in url_list:
                 executor.submit(self.get_raw_data, url)
+        # for url in url_list:
+        #     thread = Thread(target=self.get_raw_data, args=(url,))
+        #     thread.start()
 
     def get_raw_data(self, url):
         self.players_raw.append(requests.get(url).json())
